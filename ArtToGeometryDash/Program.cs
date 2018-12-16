@@ -161,6 +161,7 @@ namespace ArtToGeometryDash
                                     Red = color.R,
                                     Green = color.G,
                                     Blue = color.B,
+                                    Hold = 10f,
                                     PositionX = -15 + coordX,
                                     PositionY = 0 + coordY,
                                     EditorL = (short)EditorLayer
