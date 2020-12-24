@@ -202,7 +202,7 @@ namespace ArtToGeometryDash
             Console.WriteLine("Art To Geometry Dash.");
             Console.WriteLine("The program for the transfer of art and other images in Geometry Dash.");
             Console.WriteLine("Version: 1.1");
-            Console.WriteLine($"{consoleLine}\n\nAuthor:\nFolleach - Creator of the program.\nRelayx - Creation Assistant.");
+            Console.WriteLine($"{consoleLine}\n\nAuthors: Folleach and Relayx");
             Console.WriteLine($"{consoleLine}\n\nFor its work, the program uses the library GeometryDashAPI\nhttps://github.com/Folleach/GeometryDashAPI");
             Console.WriteLine($"{consoleLine}\n");
             Console.ForegroundColor = ConsoleColor.Red;
