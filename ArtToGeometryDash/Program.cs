@@ -9,25 +9,26 @@ using System.Drawing;
 
 namespace ArtToGeometryDash
 {
-    class Program
+    public class Program
     {
-        static string levelName;
-        static string fileArt;
-        static int pixelSize;
-        static Bitmap art;
-        static byte[] alpha;
-        static bool useAplhaChannel;
-        static byte alphaChannel;
-        static int colorStart;
-        static float scale;
-        static int EditorLayer;
-        static int blockStart;
-        static double userDistance;
-        static bool addTrigger;
-        static float coordX, coordY;
-        static LocalLevels localLevels;
-        static Dictionary<int, int> palette = new Dictionary<int, int>();
-        static Level level;
+        private static string levelName;
+        private static int levelRevision;
+        private static string fileArt;
+        private static int pixelSize;
+        private static Bitmap art;
+        private static byte[] alpha;
+        private static bool useAplhaChannel;
+        private static byte alphaChannel;
+        private static int colorStart;
+        private static float scale;
+        private static int EditorLayer;
+        private static int blockStart;
+        private static double userDistance;
+        private static bool addTrigger;
+        private static float coordX, coordY;
+        private static LocalLevels localLevels;
+        private static Dictionary<int, int> palette = new Dictionary<int, int>();
+        private static Level level;
 
         static int BytesToInt(byte r, byte g, byte b)
         {
@@ -107,6 +108,8 @@ namespace ArtToGeometryDash
             Console.Clear();
             Console.Write("The name of the level in which the art will be placed.\nRecomended use empty level.\nPossible level damage!\n> ");
             levelName = Console.ReadLine();
+            Console.Write("Level revision.\n> ");
+            levelRevision = int.Parse(Console.ReadLine());
             Console.Clear();
 
             Stopwatch sw = new Stopwatch();
@@ -114,7 +117,7 @@ namespace ArtToGeometryDash
 
             Console.WriteLine("Loading level ...");
             localLevels = new LocalLevels();
-            level = new Level(localLevels.GetLevelByName(levelName), null, new List<int>());
+            level = new Level(localLevels.GetLevel(levelName, levelRevision));
             
             Console.WriteLine("Loading image ...");
             art = new Bitmap(fileArt);
