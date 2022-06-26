@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Globalization;
+using System.IO;
 
 namespace ArtToGeometryDash
 {
@@ -67,14 +68,16 @@ namespace ArtToGeometryDash
             return false;
         }
 
-        private static Bitmap OpenResizeArt(string path, int wigth, int heigth)
+        private static Bitmap OpenResizeArt(string path, int width, int height)
         {
-            Bitmap img = new Bitmap(path);
-            Bitmap res = new Bitmap(wigth, heigth);
+            var img = new Bitmap(path);
+            var res = new Bitmap(width, height);
             var drawImage = Graphics.FromImage(res);
 
             drawImage.InterpolationMode = InterpolationMode.Bilinear;
-            drawImage.DrawImage(img, 0, 0, artWight, artHeight);
+            var destination = new Rectangle(0, 0, width, height);
+            var source = new Rectangle(0, 0, img.Width, img.Height);
+            drawImage.DrawImage(img, destination, source, GraphicsUnit.Pixel);
 
             return res;
         }
@@ -119,10 +122,12 @@ namespace ArtToGeometryDash
             Console.Title = "Art To Geometry Dash";
             Welcome();
 
-            InputSettings();
+            localLevels = new LocalLevels();
+            InputSettings(localLevels);
 
             Console.Write("How to add image, HSV or RGB (HSV use only 1 color channel)\nWrite h or r\n> ");
             mode = Console.ReadLine().ToLower();
+            Console.Clear();
             if (mode == "h")
                 InputHSVSettings();
             else
@@ -133,10 +138,9 @@ namespace ArtToGeometryDash
             sw.Restart();
 
             Console.WriteLine("Loading image ...");
-            art = OpenResizeArt(fileArt, artWight, artWight);
+            art = OpenResizeArt(fileArt, artWight, artHeight);
 
             Console.WriteLine("Loading level ...");
-            localLevels = new LocalLevels();
             if (levelRevision == -1)
                 level = new Level(localLevels.GetLevel(levelName));
             else
@@ -181,13 +185,21 @@ namespace ArtToGeometryDash
             Console.Clear();
         }
 
-        private static void InputSettings()
+        private static void InputSettings(LocalLevels levels)
         {
-            Console.Write("Image path.\nExample: C:\\images\\my.png\n> ");
-            fileArt = Console.ReadLine().Replace("\"", "");
+            
+            while (true)
+            {
+                Console.Write("Image path.\nExample: C:\\images\\my.png\n> ");
+                fileArt = Console.ReadLine().Replace("\"", "");
+                if (File.Exists(fileArt))
+                    break;
+                Console.WriteLine($"File '{fileArt}' doesn't contains\n");
+            }
+            
             Console.Clear();
 
-            Console.Write("Art Width and height.\nExample: 32 64\n> ");
+            Console.Write("Art Width and height.\nExample: 32 32\n> ");
             string[] artsize = Console.ReadLine().Split(' ');
             artWight = int.Parse(artsize[0]);
             artHeight = int.Parse(artsize[1]);
@@ -213,9 +225,6 @@ namespace ArtToGeometryDash
                     filterColor[0] = byte.Parse(al[0]);
                     filterColor[1] = byte.Parse(al[1]);
                     filterColor[2] = byte.Parse(al[2]);
-
-                    Console.Write("Color similarity ratio.\n0 - Exact color match\nThe higher the value, the less color will be used in the level.\nRecommended value: 10\n> ");
-                    userDistance = double.Parse(Console.ReadLine());
                 }
                 filtering = true;
             }
@@ -240,27 +249,35 @@ namespace ArtToGeometryDash
                 coordY = float.Parse(coords[1]) * 60;
             }
             Console.Clear();
-
-            Console.Write("The name of the level in which the art will be placed.\nRecomended use empty level.\nPossible level damage!\n> ");
-            levelName = Console.ReadLine();
-            Console.Write("Level revision. Void or string if not revision.\n> ");
-            string rev = Console.ReadLine();
-            if (int.TryParse(rev, out int num))
-                levelRevision = int.Parse(rev);
-            else
-                levelRevision = -1;
+            
+            while (true)
+            {
+                Console.Write("The name of the level in which the art will be placed.\nRecomended use empty level.\nPossible level damage!\n> ");
+                levelName = Console.ReadLine();
+                Console.Write("Level revision. Void or string if not revision.\n> ");
+                var rev = Console.ReadLine();
+                levelRevision = int.TryParse(rev, out var num) ? num : -1;
+                try
+                {
+                    levels.GetLevel(levelName, levelRevision == -1 ? 0 : levelRevision);
+                }
+                catch
+                {
+                    Console.WriteLine($"Level '{levelName}' with revision doesn't contains\n");
+                    continue;
+                }
+                break;
+            }
+            
             Console.Clear();
         }
 
         private static void InputRGBSettings()
-        {   
-            if (!filtering)
-            {
-                Console.Write("Color similarity ratio.\n0 - Exact color match\nThe higher the value, the less color will be used in the level.\nRecommended value: 10\n> ");
-                userDistance = double.Parse(Console.ReadLine());
-                Console.Clear();
-            }
-            
+        {
+            Console.Write("Color similarity ratio.\n0 - Exact color match\nThe higher the value, the less color will be used in the level.\nRecommended value: 10\n> ");
+            userDistance = double.Parse(Console.ReadLine(), CultureInfo.InvariantCulture);
+            Console.Clear();
+
             Console.Write("What ID to start creating the palette\n> ");
             colorStart = int.Parse(Console.ReadLine());
             Console.Clear();
@@ -273,6 +290,12 @@ namespace ArtToGeometryDash
 
         private static void InputHSVSettings()
         {
+            if (filtering)
+            {
+                Console.Write("Color similarity ratio (for deleting hsv colors).\n0 - Exact color match\nThe higher the value, the less color will be used in the level.\nRecommended value: 10\n> ");
+                userDistance = double.Parse(Console.ReadLine(), CultureInfo.InvariantCulture);
+                Console.Clear();
+            }
             Console.Write("ID for base HSV color\n> ");
             HSVChannel = short.Parse(Console.ReadLine());
             Console.Clear();
