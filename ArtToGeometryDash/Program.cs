@@ -35,6 +35,7 @@ namespace ArtToGeometryDash
         private static bool filtering;
         private static string mode;
         private static short HSVChannel;
+        private static bool debugMode;
 
         const string consoleLine = "________________";
 
@@ -82,15 +83,15 @@ namespace ArtToGeometryDash
             return res;
         }
 
-        private static string RGB2HSVString(byte ri, byte gi, byte bi)
+        private static Hsv Rgb2HsvString(byte ri, byte gi, byte bi)
         {
             int h;
             float s, v;
             float max, min;
-            
-            float r = (float)ri / 255;
-            float g = (float)gi / 255;
-            float b = (float)bi / 255;
+
+            var r = (float)ri / 255;
+            var g = (float)gi / 255;
+            var b = (float)bi / 255;
 
             max = (float)Math.Max(Math.Max(ri, gi), bi) / 255;
             min = (float)Math.Min(Math.Min(ri, gi), bi) / 255;
@@ -114,7 +115,12 @@ namespace ArtToGeometryDash
 
             v = max;
 
-            return string.Format("{0}a{1}a{2}a0a0", h, Math.Round(s, 2), Math.Round(v, 2)).Replace(",", ".");
+            return new Hsv()
+            {
+                Hue = h,
+                Saturation = (float)Math.Round(s, 2),
+                Brightness = (float)Math.Round(v, 2)
+            };
         }
 
         static void Main(string[] args)
@@ -122,7 +128,29 @@ namespace ArtToGeometryDash
             Console.Title = "Art To Geometry Dash";
             Welcome();
 
-            localLevels = new LocalLevels();
+            string? path = null;
+            LocalLevels? localLevels = null;
+            while (localLevels == null)
+            {
+                try
+                {
+                    localLevels = LocalLevels.LoadFile(path);
+                }
+                catch (Exception e)
+                {
+                    if (debugMode)
+                    {
+                        Console.WriteLine(e.Message);
+                        Console.WriteLine(e.StackTrace);
+                    }
+                    Console.WriteLine($"failed to load game saves: '{e.Message}'");
+                    Console.WriteLine("press Ctrl + C for exit");
+                    Console.WriteLine("or enter a full path to the CCLocalLevels.dat for continue");
+                    Console.Write("> ");
+                    path = Console.ReadLine();
+                }
+            }
+
             InputSettings(localLevels);
 
             Console.Write("How to add image, HSV or RGB (HSV use only 1 color channel)\nWrite h or r\n> ");
@@ -131,7 +159,7 @@ namespace ArtToGeometryDash
             if (mode == "h")
                 InputHSVSettings();
             else
-                InputRGBSettings();
+                InputRgbSettings();
             Console.Clear();
 
             Stopwatch sw = new Stopwatch();
@@ -149,13 +177,13 @@ namespace ArtToGeometryDash
 
             Console.WriteLine("Creating art...");
             if (mode == "h")
-                CreateHSVart();
+                CreateHsvArt();
             else
-                CreateRGBart();
+                CreateRgBart();
 
             Console.WriteLine("Save...");
-            localLevels.GetLevel(levelName).LevelString = level.ToString();
-            localLevels.Save();
+            localLevels.GetLevel(levelName).SaveLevel(level);
+            localLevels.Save(path);
 
             sw.Stop();
 
@@ -181,7 +209,8 @@ namespace ArtToGeometryDash
             Console.WriteLine("You must close all instances of the game before moving the image!");
             Console.ForegroundColor = ConsoleColor.Gray;
             Console.WriteLine("Press any button to continue.");
-            Console.ReadKey();
+            var key = Console.ReadKey();
+            debugMode = key.Key == ConsoleKey.B;
             Console.Clear();
         }
 
@@ -272,7 +301,7 @@ namespace ArtToGeometryDash
             Console.Clear();
         }
 
-        private static void InputRGBSettings()
+        private static void InputRgbSettings()
         {
             Console.Write("Color similarity ratio.\n0 - Exact color match\nThe higher the value, the less color will be used in the level.\nRecommended value: 10\n> ");
             userDistance = double.Parse(Console.ReadLine(), CultureInfo.InvariantCulture);
@@ -283,7 +312,7 @@ namespace ArtToGeometryDash
             Console.Clear();
 
             Console.Write("Add a color changing trigger?\nWrite Y or N\n> ");
-            string addtrgstr = Console.ReadLine();
+            var addtrgstr = Console.ReadLine();
             addTrigger = addtrgstr.ToLower() == "yes" || addtrgstr.ToLower() == "y" ? true : false;
             Console.Clear();
         }
@@ -301,9 +330,9 @@ namespace ArtToGeometryDash
             Console.Clear();
         }
 
-        private static void CreateRGBart()
+        private static void CreateRgBart()
         {
-            int currentColorID = colorStart;
+            var currentColorID = colorStart;
 
             for (int x = 0; x < art.Width; x += 1)
             {
@@ -326,16 +355,21 @@ namespace ArtToGeometryDash
                     }
                     if (!palette.ContainsKey(colorInt))
                     {
-                        int? sim = FindSimilar(color.R, color.G, color.B);
+                        var sim = FindSimilar(color.R, color.G, color.B);
                         if (sim == null)
                         {
-                            level.AddColor(new GeometryDashAPI.Levels.Color((short)currentColorID, color.R, color.G, color.B));
+                            level.AddColor(new GeometryDashAPI.Levels.Color((short)currentColorID)
+                            {
+                                Red = color.R,
+                                Green = color.G,
+                                Blue = color.B
+                            });
                             palette.Add(colorInt, currentColorID);
                             if (addTrigger)
                             {
                                 level.AddBlock(new PulseTrigger()
                                 {
-                                    TargetID = currentColorID,
+                                    TargetGroupId = currentColorID,
                                     Red = color.R,
                                     Green = color.G,
                                     Blue = color.B,
@@ -352,25 +386,33 @@ namespace ArtToGeometryDash
                             colorInt = (int)sim;
                         }
                     }
-                    DetailBlock block = new DetailBlock(917);
-                    block.WithoutLoaded.Add("21", palette[colorInt].ToString());
-                    block.Scale = scale;
-                    block.EditorL = (short)EditorLayer;
-                    block.PositionX = (x * 7.5f * scale) + coordX;
-                    block.PositionY = ((art.Height - y) * 7.5f * scale) + coordY;
+                    var block = new ColorBlock(917)
+                    {
+                        ColorBase = (short)palette[colorInt],
+                        Scale = scale,
+                        EditorL = (short)EditorLayer,
+                        PositionX = x * 7.5f * scale + coordX,
+                        PositionY = (art.Height - y) * 7.5f * scale + coordY
+                    };
                     level.AddBlock(block);
                 }
             }
         }
 
-        private static void CreateHSVart(){
-            level.AddColor(new GeometryDashAPI.Levels.Color(HSVChannel, 255, 0, 0));
-
-            for (int x = 0; x < art.Width; x += 1)
+        private static void CreateHsvArt()
+        {
+            level.AddColor(new GeometryDashAPI.Levels.Color(HSVChannel)
             {
-                for (int y = 0; y < art.Height; y += 1)
+                Red = 255,
+                Green = 0,
+                Blue = 0
+            });
+
+            for (var x = 0; x < art.Width; x += 1)
+            {
+                for (var y = 0; y < art.Height; y += 1)
                 {
-                    System.Drawing.Color color = art.GetPixel(x, y);
+                    var color = art.GetPixel(x, y);
                     if (filtering){
                         if (useAlphaChannel)
                         {
@@ -384,14 +426,13 @@ namespace ArtToGeometryDash
                         }
                     }                    
 
-                    DetailBlock block = new DetailBlock(917);
-                    block.WithoutLoaded.Add("21", HSVChannel.ToString());
+                    var block = new ColorBlock(917);
+                    block.ColorBase = HSVChannel;
                     block.Scale = scale;
                     block.EditorL = (short)EditorLayer;
                     block.PositionX = (x * 7.5f * scale) + coordX;
                     block.PositionY = ((art.Height - y) * 7.5f * scale) + coordY;
-                    block.WithoutLoaded.Add("41", "1");
-                    block.WithoutLoaded.Add("43", RGB2HSVString(color.R, color.G, color.B));
+                    block.Hsv = Rgb2HsvString(color.R, color.G, color.B);
                     level.AddBlock(block);
                 }
             }
