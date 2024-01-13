@@ -12,6 +12,7 @@ jobs:
       packages: write
     strategy:
       matrix:
+        dotnet: [ "6.0" ]
         runtime: [ linux-x64, win-x64 ]
         project: [ ArtToGeometryDash ]
     steps:
@@ -19,7 +20,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: 6.0.x
+          dotnet-version: ${{ matrix.dotnet }}.x
       - name: Set Version
         run: echo ${{ github.ref_name }} | sed -r "s/^v/TOOL_VERSION=/" >> $GITHUB_ENV
       - name: Restore dependencies
@@ -28,7 +29,7 @@ jobs:
         run: dotnet publish ./${{ matrix.project }}/${{ matrix.project }}.csproj -c Release -r ${{ matrix.runtime }} -p:Version=$TOOL_VERSION -p:PublishSingleFile=true --self-contained true
       - name: edit binaries
         run: |
-          cd ./${{ matrix.project }}/bin/Release/net6.0/${{ matrix.runtime }}/publish
+          cd ./${{ matrix.project }}/bin/Release/net${{ matrix.dotnet }}/${{ matrix.runtime }}/publish
           rm *.pdb
           for file in *; do
              if [[ $file == *.* ]]; then
@@ -43,4 +44,4 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ./${{ matrix.project }}/bin/Release/net8.0/${{ matrix.runtime }}/publish/*
+            ./${{ matrix.project }}/bin/Release/net${{ matrix.dotnet }}/${{ matrix.runtime }}/publish/*
