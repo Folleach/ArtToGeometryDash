@@ -1,0 +1,46 @@
+name: Publish
+
+on:
+  release:
+    types: [ created ]
+
+jobs:
+  independent:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    strategy:
+      matrix:
+        runtime: [ linux-x64, win-x64 ]
+        project: [ ArtToGeometryDash ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 6.0.x
+      - name: Set Version
+        run: echo ${{ github.ref_name }} | sed -r "s/^v/TOOL_VERSION=/" >> $GITHUB_ENV
+      - name: Restore dependencies
+        run: dotnet restore ./ArtToGeometryDash.sln
+      - name: publish
+        run: dotnet publish ./${{ matrix.project }}/${{ matrix.project }}.csproj -r ${{ matrix.runtime }} -p:Version=$TOOL_VERSION -p:PublishSingleFile=true --self-contained true
+      - name: edit binaries
+        run: |
+          cd ./${{ matrix.project }}/bin/Release/net6.0/${{ matrix.runtime }}/publish
+          rm *.pdb
+          for file in *; do
+             if [[ $file == *.* ]]; then
+               base="${file%.*}"
+               ext="${file##*.}"
+               mv "$file" "${base}-${{ matrix.runtime }}.${ext}"
+             else
+               mv "$file" "${file}-${{ matrix.runtime }}"
+             fi
+           done
+      - name: release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./${{ matrix.project }}/bin/Release/net8.0/${{ matrix.runtime }}/publish/*
